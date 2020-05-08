@@ -5,12 +5,7 @@ import com.olejnik.nick.backend.service.CovidService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.board.Board;
 import com.vaadin.flow.component.charts.Chart;
-import com.vaadin.flow.component.charts.model.ChartType;
-import com.vaadin.flow.component.charts.model.Configuration;
-import com.vaadin.flow.component.charts.model.Crosshair;
-import com.vaadin.flow.component.charts.model.ListSeries;
-import com.vaadin.flow.component.charts.model.XAxis;
-import com.vaadin.flow.component.charts.model.YAxis;
+import com.vaadin.flow.component.charts.model.*;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.html.Div;
@@ -124,8 +119,13 @@ public class DashboardView extends Div implements AfterNavigationObserver {
         configuration.addxAxis(x);
 
         YAxis y = new YAxis();
+        y.setTitle("Всего");
         y.setMin(0);
         configuration.addyAxis(y);
+
+        Tooltip tooltip = new Tooltip();
+        tooltip.setShared(true);
+        configuration.setTooltip(tooltip);
 
     }
 }
