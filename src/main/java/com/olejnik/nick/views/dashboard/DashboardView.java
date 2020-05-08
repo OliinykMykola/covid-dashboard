@@ -1,9 +1,7 @@
 package com.olejnik.nick.views.dashboard;
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.olejnik.nick.backend.data.Day;
+import com.olejnik.nick.backend.service.CovidService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.board.Board;
 import com.vaadin.flow.component.charts.Chart;
@@ -15,19 +13,17 @@ import com.vaadin.flow.component.charts.model.XAxis;
 import com.vaadin.flow.component.charts.model.YAxis;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dependency.JsModule;
-import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
-import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.AfterNavigationEvent;
 import com.vaadin.flow.router.AfterNavigationObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.olejnik.nick.views.main.MainView;
+
+import java.util.List;
 
 @Route(value = "dashboard", layout = MainView.class)
 @RouteAlias(value = "", layout = MainView.class)
@@ -36,48 +32,50 @@ import com.olejnik.nick.views.main.MainView;
 @JsModule("@vaadin/vaadin-lumo-styles/badge.js")
 public class DashboardView extends Div implements AfterNavigationObserver {
 
-    private Grid<HealthGridItem> grid = new Grid<>();
+    private final CovidService covidService;
 
-    private Chart monthlyVisitors = new Chart();
-    private Chart responseTimes = new Chart();
-    private final H2 casesH2 = new H2();
-    private final H2 activeH2 = new H2();
-    private final H2 recoveredH2 = new H2();
-    private final H2 deathH2 = new H2();
+    private final Chart casesConfirmationChart = new Chart();
+    private final List<Day> ukraineData;
 
-    public DashboardView() {
+    public DashboardView(CovidService covidService) {
+        this.covidService = covidService;
+        ukraineData = covidService.getLatestUkraineData();
         setId("dashboard-view");
+
+        Day lastDay = ukraineData.get(ukraineData.size() - 1);
+        Day dayAfterLastDay = ukraineData.get(ukraineData.size() - 2);
+
         Board board = new Board();
+
+        String lastDayTemplate = "%s за минувшие сутки";
+
+        H2 activeH2 = new H2();
+        H2 recoveredH2 = new H2();
+        H2 deathH2 = new H2();
+        H2 casesH2 = new H2();
         board.addRow(
-                createBadge("Подтверждённые", casesH2, "primary-text", "+75 за минувшие сутки", "badge"),
-                createBadge("Активные", activeH2, "contrast-text", "+513 за минувшие сутки", "badge contrast"),
-                createBadge("Выздоровело", recoveredH2, "success-text", "+4576 за минувшие сутки", "badge success"),
-                createBadge("Умерло", deathH2, "error-text","+85 за минувшие сутки", "badge error")
+                createBadge("Подтверждённые", casesH2, "primary-text",
+                        String.format(lastDayTemplate, lastDay.getConfirmed() - dayAfterLastDay.getConfirmed()), "badge"),
+                createBadge("Активные", activeH2, "contrast-text",
+                        String.format(lastDayTemplate, lastDay.getActive() - dayAfterLastDay.getActive()), "badge contrast"),
+                createBadge("Выздоровело", recoveredH2, "success-text",
+                        String.format(lastDayTemplate, lastDay.getRecovered() - dayAfterLastDay.getRecovered()), "badge success"),
+                createBadge("Умерло", deathH2, "error-text",
+                        String.format(lastDayTemplate, lastDay.getDeaths() - dayAfterLastDay.getDeaths()), "badge error")
         );
 
-        monthlyVisitors.getConfiguration()
+        casesH2.setText(String.valueOf(lastDay.getConfirmed()));
+        activeH2.setText(String.valueOf(lastDay.getActive()));
+        recoveredH2.setText(String.valueOf(lastDay.getRecovered()));
+        deathH2.setText(String.valueOf(lastDay.getDeaths()));
+
+        casesConfirmationChart.getConfiguration()
                 .setTitle("Статистика с момента подтверждения первой сотни заболевших");
-        monthlyVisitors.getConfiguration().getChart().setType(ChartType.COLUMN);
+        casesConfirmationChart.getConfiguration().getChart().setType(ChartType.COLUMN);
         WrapperCard monthlyVisitorsWrapper = new WrapperCard("wrapper",
-                new Component[] { monthlyVisitors }, "card");
+                new Component[] {casesConfirmationChart}, "card");
         board.add(monthlyVisitorsWrapper);
 
-        grid.addColumn(HealthGridItem::getCity).setHeader("City");
-        grid.addColumn(new ComponentRenderer<>(item -> {
-            Span span = new Span(item.getStatus());
-            span.getElement().getThemeList().add(item.getTheme());
-            return span;
-        })).setFlexGrow(0).setWidth("100px").setHeader("Status");
-        grid.addColumn(HealthGridItem::getItemDate).setHeader("Date")
-                .setWidth("140px");
-        grid.addThemeVariants(GridVariant.LUMO_NO_BORDER);
-
-        WrapperCard gridWrapper = new WrapperCard("wrapper",
-                new Component[] { new H3("Service health"), grid }, "card");
-        responseTimes.getConfiguration().setTitle("Response times");
-        WrapperCard responseTimesWrapper = new WrapperCard("wrapper",
-                new Component[] { responseTimes }, "card");
-//        board.addRow(gridWrapper, responseTimesWrapper);
 
         add(board);
     }
@@ -100,70 +98,33 @@ public class DashboardView extends Div implements AfterNavigationObserver {
     @Override
     public void afterNavigation(AfterNavigationEvent event) {
 
-        // Set some data when this view is displayed.
-
-        // Top row widgets
-        casesH2.setText("745");
-        activeH2.setText("1234");
-        recoveredH2.setText("412341234");
-        deathH2.setText("1234");
-
-//        createBadge("Подтверждённые", casesH2, "primary-text", "+75 за минувшие сутки", "badge"),
-//                createBadge("Активные", activeH2, "success-text", "+513 за минувшие сутки", "badge success"),
-//                createBadge("Выздоровело", recoveredH2, "success-text", "+4576 за минувшие сутки", "badge success"),
-//                createBadge("Умерло", deathH2, "error-text","+85 за минувшие сутки", "badge error")
-
         // First chart
-        Configuration configuration = monthlyVisitors.getConfiguration();
-        configuration.addSeries(new ListSeries("Подтверждённые", 49.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 216.4,
-                194.1, 95.6, 54.4));
-        configuration.addSeries(
-                new ListSeries("Умерло", 83.6, 78.8, 98.5, 93.4, 106.0, 84.5, 105.0, 104.3, 91.2, 83.5, 106.6, 92.3));
-        configuration.addSeries(
-                new ListSeries("Выздоровело", 48.9, 38.8, 39.3, 41.4, 47.0, 48.3, 59.0, 59.6, 52.4, 65.2, 59.3, 51.2));
-        configuration.addSeries(
-                new ListSeries("Активные", 42.4, 33.2, 34.5, 39.7, 52.6, 75.5, 57.4, 60.4, 47.6, 39.1, 46.8, 51.1));
+        Configuration configuration = casesConfirmationChart.getConfiguration();
+
+        ListSeries confirmed = new ListSeries("Подтверждённые");
+        ukraineData.forEach(day -> confirmed.addData(day.getConfirmed()));
+        configuration.addSeries(confirmed);
+
+        ListSeries death = new ListSeries("Умерло");
+        ukraineData.forEach(day -> death.addData(day.getDeaths()));
+        configuration.addSeries(death);
+
+        ListSeries recovered = new ListSeries("Выздоровело");
+        ukraineData.forEach(day -> recovered.addData(day.getRecovered()));
+        configuration.addSeries(recovered);
+
+        ListSeries active = new ListSeries("Активные");
+        ukraineData.forEach(day -> active.addData(day.getActive()));
+        configuration.addSeries(active);
 
         XAxis x = new XAxis();
         x.setCrosshair(new Crosshair());
-        x.setCategories("23 апреля", "24 апреля", "25 апреля", "26 апреля", "27 апреля", "28 апреля", "29 апреля",
-                "30 апреля", "1 мая", "2 мая", "3 мая", "4 мая");
+        ukraineData.forEach(day -> x.addCategory(day.getDate().toString()));
         configuration.addxAxis(x);
 
         YAxis y = new YAxis();
         y.setMin(0);
         configuration.addyAxis(y);
 
-        // Grid
-        List<HealthGridItem> gridItems = new ArrayList<>();
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "M\u00FCnster", "Germany", "Good", "badge"));
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "Cluj-Napoca", "Romania", "Good", "badge"));
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "Ciudad Victoria", "Mexico", "Good", "badge"));
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "Ebetsu", "Japan", "Excellent", "badge success"));
-        gridItems
-                .add(new HealthGridItem(LocalDate.of(2019, 1, 14), "S\u00E3o Bernardo do Campo", "Brazil", "Good", "badge"));
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "Maputo", "Mozambique", "Good", "badge"));
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "Warsaw", "Poland", "Good", "badge"));
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "Kasugai", "Japan", "Failing", "badge error"));
-        gridItems.add(new HealthGridItem(LocalDate.of(2019, 1, 14), "Lancaster", "United States", "Excellent",
-                "badge success"));
-
-        grid.setItems(gridItems);
-
-        // Second chart
-        configuration = responseTimes.getConfiguration();
-        configuration
-                .addSeries(new ListSeries("Tokyo", 7.0, 6.9, 9.5, 14.5, 18.2, 21.5, 25.2, 26.5, 23.3, 18.3, 13.9, 9.6));
-        configuration
-                .addSeries(new ListSeries("London", 3.9, 4.2, 5.7, 8.5, 11.9, 15.2, 17.0, 16.6, 14.2, 10.3, 6.6, 4.8));
-
-        x = new XAxis();
-        x.setCrosshair(new Crosshair());
-        x.setCategories("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
-        configuration.addxAxis(x);
-
-        y = new YAxis();
-        y.setMin(0);
-        configuration.addyAxis(y);
     }
 }
