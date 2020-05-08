@@ -46,6 +46,7 @@ public class DashboardView extends Div implements AfterNavigationObserver {
         Day dayAfterLastDay = ukraineData.get(ukraineData.size() - 2);
 
         Board board = new Board();
+        board.setSizeFull();
 
         String lastDayTemplate = "%s за минувшие сутки";
 
