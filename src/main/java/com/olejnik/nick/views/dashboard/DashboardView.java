@@ -9,6 +9,7 @@ import com.vaadin.flow.component.board.Board;
 import com.vaadin.flow.component.board.Row;
 import com.vaadin.flow.component.charts.Chart;
 import com.vaadin.flow.component.charts.model.*;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.grid.Grid;
@@ -31,6 +32,10 @@ import java.util.Optional;
 @JsModule("@vaadin/vaadin-lumo-styles/badge.js")
 public class DashboardView extends Div {
 
+    private final String TOTAL_CASES_CHART = "Линейная статистика";
+    private final String DAILY_CASES_CHART = "Кривая роста";
+
+
     private final CovidService covidService;
 
     private final List<Day> ukraineTimeline;
@@ -52,7 +57,7 @@ public class DashboardView extends Div {
         board.setSizeFull();
 
         board.addRow(getHeaderLabels(ukraineSummaryData));
-        board.add(getCasesConfirmationWrapper());
+        board.add(getMainChartWrapper());
         board.add(getUkraineRegionsGridDataWrapper());
 
         add(board);
@@ -63,7 +68,7 @@ public class DashboardView extends Div {
 
         Grid<RegionData> ukraineRegionsGrid = new Grid<>();
 
-        Optional <RegionData> defaultRegion = regionSummaryData.getUkraine().stream()
+        Optional<RegionData> defaultRegion = regionSummaryData.getUkraine().stream()
                 .filter(regionData -> "Харківська область".equals(regionData.getLabels().getUk())).findFirst();
 
         ukraineRegionsGrid.setItems(regionSummaryData.getUkraine());
@@ -107,15 +112,30 @@ public class DashboardView extends Div {
         return board;
     }
 
+    private WrapperCard getMainChartWrapper() {
+        Div chartDiv = new Div();
+        chartDiv.setSizeFull();
+        ComboBox<String> chartTypeCombobox = new ComboBox<>("График: ");
+        chartTypeCombobox.setWidthFull();
+        chartTypeCombobox.setPreventInvalidInput(true);
+        chartTypeCombobox.setItems(TOTAL_CASES_CHART, DAILY_CASES_CHART);
+        chartTypeCombobox.setAllowCustomValue(false);
+        chartTypeCombobox.addValueChangeListener(event -> {
+            chartDiv.removeAll();
+            chartDiv.add(TOTAL_CASES_CHART.equals(event.getValue()) ? getTotalCasesChart() : getLineChart());
+        });
+        chartTypeCombobox.setValue(TOTAL_CASES_CHART);
 
-    private WrapperCard getCasesConfirmationWrapper() {
-        Chart casesConfirmationChart = new Chart();
+        return new WrapperCard("wrapper", new Component[]{chartTypeCombobox, chartDiv}, "card");
+    }
 
-        casesConfirmationChart.getConfiguration()
-                .setTitle("Статистика с момента подтверждения первой сотни заболевших");
-        casesConfirmationChart.getConfiguration().getChart().setType(ChartType.COLUMN);
+    private Chart getTotalCasesChart() {
+        Chart totalCasesChart = new Chart();
+        totalCasesChart.getConfiguration().setTitle("Общее количество заболевших и выздоровевших");
+        totalCasesChart.getConfiguration().setSubTitle("(с момента подтверждения первой сотни)");
+        totalCasesChart.getConfiguration().getChart().setType(ChartType.COLUMN);
 
-        Configuration configuration = casesConfirmationChart.getConfiguration();
+        Configuration configuration = totalCasesChart.getConfiguration();
 
         ListSeries confirmed = new ListSeries("Подтвержденные");
         ukraineTimeline.forEach(day -> confirmed.addData(day.getConfirmed()));
@@ -147,7 +167,84 @@ public class DashboardView extends Div {
         tooltip.setShared(true);
         configuration.setTooltip(tooltip);
 
-        return new WrapperCard("wrapper", new Component[]{casesConfirmationChart}, "card");
+        return totalCasesChart;
+    }
+
+    private Chart getLineChart() {
+        Chart casesConfirmationChart = new Chart();
+        casesConfirmationChart.getConfiguration().setTitle("Ежедневный прирост");
+        casesConfirmationChart.getConfiguration().setSubTitle("(с момента подтверждения первой сотни)");
+        casesConfirmationChart.getConfiguration().getChart().setType(ChartType.LINE);
+
+        Configuration configuration = casesConfirmationChart.getConfiguration();
+
+        ListSeries confirmed = new ListSeries("Подтвержденные");
+        for (int i = 0; i < ukraineTimeline.size(); i++) {
+            Day day = ukraineTimeline.get(i);
+            if (i > 0) {
+                Day dayBefore = ukraineTimeline.get(i - 1);
+                confirmed.addData(day.getConfirmed() - dayBefore.getConfirmed());
+
+            } else {
+                confirmed.addData(day.getConfirmed());
+            }
+        }
+        configuration.addSeries(confirmed);
+
+        ListSeries death = new ListSeries("Умершие");
+        for (int i = 0; i < ukraineTimeline.size(); i++) {
+            Day day = ukraineTimeline.get(i);
+            if (i > 0) {
+                Day dayBefore = ukraineTimeline.get(i - 1);
+                death.addData(day.getDeaths() - dayBefore.getDeaths());
+
+            } else {
+                death.addData(day.getDeaths());
+            }
+        }
+        configuration.addSeries(death);
+
+        ListSeries recovered = new ListSeries("Выздоровевшие");
+        for (int i = 0; i < ukraineTimeline.size(); i++) {
+            Day day = ukraineTimeline.get(i);
+            if (i > 0) {
+                Day dayBefore = ukraineTimeline.get(i - 1);
+                recovered.addData(day.getRecovered() - dayBefore.getRecovered());
+
+            } else {
+                recovered.addData(day.getRecovered());
+            }
+        }
+        configuration.addSeries(recovered);
+
+        ListSeries active = new ListSeries("Активные");
+        for (int i = 0; i < ukraineTimeline.size(); i++) {
+            Day day = ukraineTimeline.get(i);
+            if (i > 0) {
+                Day dayBefore = ukraineTimeline.get(i - 1);
+                active.addData(day.getActive() - dayBefore.getActive());
+
+            } else {
+                active.addData(day.getActive());
+            }
+        }
+        configuration.addSeries(active);
+
+        XAxis x = new XAxis();
+        x.setCrosshair(new Crosshair());
+        ukraineTimeline.forEach(day -> x.addCategory(day.getDate().toString()));
+        configuration.addxAxis(x);
+
+        YAxis y = new YAxis();
+        y.setTitle("Всего");
+        y.setMin(0);
+        configuration.addyAxis(y);
+
+        Tooltip tooltip = new Tooltip();
+        tooltip.setShared(true);
+        configuration.setTooltip(tooltip);
+
+        return casesConfirmationChart;
     }
 
     private Component[] getHeaderLabels(RegionData ukraineData) {
