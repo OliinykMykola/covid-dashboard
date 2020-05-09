@@ -10,6 +10,9 @@ import lombok.NoArgsConstructor;
 @Data
 public class RegionData {
 
+    @JsonProperty("label")
+    private RegionLabel labels;
+
     @JsonProperty("id")
     private Integer id;
 

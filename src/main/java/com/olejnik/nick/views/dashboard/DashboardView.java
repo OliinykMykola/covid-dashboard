@@ -10,15 +10,18 @@ import com.vaadin.flow.component.charts.Chart;
 import com.vaadin.flow.component.charts.model.*;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dependency.JsModule;
+import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.olejnik.nick.views.main.MainView;
 
 import java.util.List;
+import java.util.Optional;
 
 @Route(value = "dashboard", layout = MainView.class)
 @RouteAlias(value = "", layout = MainView.class)
@@ -41,16 +44,60 @@ public class DashboardView extends Div {
         ukraineTimeline = covidService.getLatestUkraineData();
 
         regionSummaryData = covidService.getRegionDataSummary();
-        ukraineSummaryData = regionSummaryData.getWorld().stream().filter(regionData -> "Ukraine".equals(regionData.getCountry())).findFirst().get();
+        ukraineSummaryData = regionSummaryData.getWorld().stream()
+                .filter(regionData -> "Ukraine".equals(regionData.getCountry())).findFirst().get();
 
         Board board = new Board();
         board.setSizeFull();
 
         board.addRow(getHeaderLabels(ukraineSummaryData));
         board.add(getCasesConfirmationWrapper());
+        board.add(getUkraineRegionsGridDataWrapper());
 
         add(board);
     }
+
+    private WrapperCard getUkraineRegionsGridDataWrapper() {
+
+        Grid<RegionData> ukraineRegionsGrid = new Grid<>();
+
+        Optional <RegionData> defaultRegion = regionSummaryData.getUkraine().stream()
+                .filter(regionData -> "Харківська область".equals(regionData.getLabels().getUk())).findFirst();
+
+        ukraineRegionsGrid.setItems(regionSummaryData.getUkraine());
+        ukraineRegionsGrid.addColumn(regionData -> regionData.getLabels().getUk()).setHeader("Регион").setSortable(true);
+        ukraineRegionsGrid.addColumn(RegionData::getConfirmed).setHeader("Подтверждено").setSortable(true);
+        ukraineRegionsGrid.addColumn(RegionData::getExisting).setHeader("Активные").setSortable(true);
+        ukraineRegionsGrid.addColumn(RegionData::getRecovered).setHeader("Выздоровевшие").setSortable(true);
+        ukraineRegionsGrid.addColumn(RegionData::getDeaths).setHeader("Умершие").setSortable(true);
+
+        VerticalLayout regionDataHeader = new VerticalLayout();
+
+        VerticalLayout wrapper = new VerticalLayout(regionDataHeader);
+        wrapper.add(ukraineRegionsGrid);
+
+        ukraineRegionsGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
+        ukraineRegionsGrid.addSelectionListener(event -> {
+
+
+            Optional<RegionData> dataToShowStats = Optional.ofNullable(event.getFirstSelectedItem()).orElse(defaultRegion);
+            dataToShowStats.ifPresent(regionData -> {
+                regionDataHeader.removeAll();
+                H2 label = new H2(String.format("Регион: %s", regionData.getLabels().getUk()));
+                regionDataHeader.add(label);
+                regionDataHeader.add(getHeaderLabels(regionData));
+            });
+        });
+
+        defaultRegion.ifPresent(region -> {
+            ukraineRegionsGrid.select(region);
+            ukraineRegionsGrid.scrollToIndex(regionSummaryData.getUkraine().indexOf(region));
+        });
+
+
+        return new WrapperCard("wrapper", new Component[]{wrapper}, "card");
+    }
+
 
     private WrapperCard getCasesConfirmationWrapper() {
         Chart casesConfirmationChart = new Chart();
@@ -61,15 +108,15 @@ public class DashboardView extends Div {
 
         Configuration configuration = casesConfirmationChart.getConfiguration();
 
-        ListSeries confirmed = new ListSeries("Подтверждённые");
+        ListSeries confirmed = new ListSeries("Подтвержденные");
         ukraineTimeline.forEach(day -> confirmed.addData(day.getConfirmed()));
         configuration.addSeries(confirmed);
 
-        ListSeries death = new ListSeries("Умерло");
+        ListSeries death = new ListSeries("Умершие");
         ukraineTimeline.forEach(day -> death.addData(day.getDeaths()));
         configuration.addSeries(death);
 
-        ListSeries recovered = new ListSeries("Выздоровело");
+        ListSeries recovered = new ListSeries("Выздоровевшие");
         ukraineTimeline.forEach(day -> recovered.addData(day.getRecovered()));
         configuration.addSeries(recovered);
 
@@ -91,8 +138,7 @@ public class DashboardView extends Div {
         tooltip.setShared(true);
         configuration.setTooltip(tooltip);
 
-        return new WrapperCard("wrapper",
-                new Component[]{casesConfirmationChart}, "card");
+        return new WrapperCard("wrapper", new Component[]{casesConfirmationChart}, "card");
     }
 
     private Component[] getHeaderLabels(RegionData ukraineData) {
