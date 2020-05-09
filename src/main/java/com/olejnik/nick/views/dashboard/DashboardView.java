@@ -1,6 +1,8 @@
 package com.olejnik.nick.views.dashboard;
 
 import com.olejnik.nick.backend.data.Day;
+import com.olejnik.nick.backend.data.RegionData;
+import com.olejnik.nick.backend.data.RegionDataSummary;
 import com.olejnik.nick.backend.service.CovidService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.board.Board;
@@ -30,20 +32,24 @@ public class DashboardView extends Div implements AfterNavigationObserver {
     private final CovidService covidService;
 
     private final Chart casesConfirmationChart = new Chart();
+
     private final List<Day> ukraineData;
+
+    RegionDataSummary regionDataSummary;
 
     public DashboardView(CovidService covidService) {
         this.covidService = covidService;
-        ukraineData = covidService.getLatestUkraineData();
         setId("dashboard-view");
 
-        Day lastDay = ukraineData.get(ukraineData.size() - 1);
-        Day dayAfterLastDay = ukraineData.get(ukraineData.size() - 2);
+        ukraineData = covidService.getLatestUkraineData();
+        regionDataSummary = covidService.getRegionDataSummary();
+
+        RegionData ukraineData = regionDataSummary.getWorld().stream().filter(regionData -> "Ukraine".equals(regionData.getCountry())).findFirst().get();
 
         Board board = new Board();
         board.setSizeFull();
 
-        String lastDayTemplate = "%s за минувшие сутки";
+        String lastDayTemplate = "+%s за минувшие сутки";
 
         H2 activeH2 = new H2();
         H2 recoveredH2 = new H2();
@@ -51,26 +57,26 @@ public class DashboardView extends Div implements AfterNavigationObserver {
         H2 casesH2 = new H2();
         board.addRow(
                 createBadge("Подтверждённые", casesH2, "primary-text",
-                        String.format(lastDayTemplate, lastDay.getConfirmed() - dayAfterLastDay.getConfirmed()), "badge"),
+                        String.format(lastDayTemplate, ukraineData.getDelta_confirmed()), "badge"),
                 createBadge("Активные", activeH2, "contrast-text",
-                        String.format(lastDayTemplate, lastDay.getActive() - dayAfterLastDay.getActive()), "badge contrast"),
+                        String.format(lastDayTemplate, ukraineData.getDelta_existing()), "badge contrast"),
                 createBadge("Выздоровело", recoveredH2, "success-text",
-                        String.format(lastDayTemplate, lastDay.getRecovered() - dayAfterLastDay.getRecovered()), "badge success"),
+                        String.format(lastDayTemplate, ukraineData.getDelta_recovered()), "badge success"),
                 createBadge("Умерло", deathH2, "error-text",
-                        String.format(lastDayTemplate, lastDay.getDeaths() - dayAfterLastDay.getDeaths()), "badge error")
+                        String.format(lastDayTemplate, ukraineData.getDelta_deaths()), "badge error")
         );
 
-        casesH2.setText(String.valueOf(lastDay.getConfirmed()));
-        activeH2.setText(String.valueOf(lastDay.getActive()));
-        recoveredH2.setText(String.valueOf(lastDay.getRecovered()));
-        deathH2.setText(String.valueOf(lastDay.getDeaths()));
+        casesH2.setText(String.valueOf(ukraineData.getConfirmed()));
+        activeH2.setText(String.valueOf(ukraineData.getExisting()));
+        recoveredH2.setText(String.valueOf(ukraineData.getRecovered()));
+        deathH2.setText(String.valueOf(ukraineData.getDeaths()));
 
         casesConfirmationChart.getConfiguration()
                 .setTitle("Статистика с момента подтверждения первой сотни заболевших");
         casesConfirmationChart.getConfiguration().getChart().setType(ChartType.COLUMN);
-        WrapperCard monthlyVisitorsWrapper = new WrapperCard("wrapper",
+        WrapperCard casesConfirmationWrapper = new WrapperCard("wrapper",
                 new Component[] {casesConfirmationChart}, "card");
-        board.add(monthlyVisitorsWrapper);
+        board.add(casesConfirmationWrapper);
 
 
         add(board);
