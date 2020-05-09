@@ -6,6 +6,7 @@ import com.olejnik.nick.backend.data.RegionDataSummary;
 import com.olejnik.nick.backend.service.CovidService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.board.Board;
+import com.vaadin.flow.component.board.Row;
 import com.vaadin.flow.component.charts.Chart;
 import com.vaadin.flow.component.charts.model.*;
 import com.vaadin.flow.component.dependency.CssImport;
@@ -57,7 +58,8 @@ public class DashboardView extends Div {
         add(board);
     }
 
-    private WrapperCard getUkraineRegionsGridDataWrapper() {
+    private Board getUkraineRegionsGridDataWrapper() {
+        Board board = new Board();
 
         Grid<RegionData> ukraineRegionsGrid = new Grid<>();
 
@@ -71,21 +73,24 @@ public class DashboardView extends Div {
         ukraineRegionsGrid.addColumn(RegionData::getRecovered).setHeader("Выздоровевшие").setSortable(true);
         ukraineRegionsGrid.addColumn(RegionData::getDeaths).setHeader("Умершие").setSortable(true);
 
-        VerticalLayout regionDataHeader = new VerticalLayout();
+        Div regionDataHeader = new Div();
+        H2 label = new H2();
 
         VerticalLayout wrapper = new VerticalLayout(regionDataHeader);
         wrapper.add(ukraineRegionsGrid);
 
         ukraineRegionsGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
+
+        Row row = new Row();
+
         ukraineRegionsGrid.addSelectionListener(event -> {
 
 
             Optional<RegionData> dataToShowStats = Optional.ofNullable(event.getFirstSelectedItem()).orElse(defaultRegion);
             dataToShowStats.ifPresent(regionData -> {
-                regionDataHeader.removeAll();
-                H2 label = new H2(String.format("Регион: %s", regionData.getLabels().getUk()));
-                regionDataHeader.add(label);
-                regionDataHeader.add(getHeaderLabels(regionData));
+                label.setText(String.format("Регион: %s", regionData.getLabels().getUk()));
+                row.removeAll();
+                row.add(getHeaderLabels(regionData));
             });
         });
 
@@ -94,8 +99,12 @@ public class DashboardView extends Div {
             ukraineRegionsGrid.scrollToIndex(regionSummaryData.getUkraine().indexOf(region));
         });
 
+        board.setSizeFull();
+        board.add(label);
+        board.addRow(row);
+        board.add(ukraineRegionsGrid);
 
-        return new WrapperCard("wrapper", new Component[]{wrapper}, "card");
+        return board;
     }
 
 
