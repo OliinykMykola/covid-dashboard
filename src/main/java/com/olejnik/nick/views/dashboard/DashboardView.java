@@ -22,6 +22,7 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.olejnik.nick.views.main.MainView;
 
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Optional;
 
@@ -249,16 +250,22 @@ public class DashboardView extends Div {
 
     private Component[] getHeaderLabels(RegionData ukraineData) {
 
-        String lastDayTemplate = "+%s за минувшие сутки";
+        String lastDayTemplate = "%s за минувшие сутки";
+
 
         return new Component[]{createBadge("Подтверждённые", new H2(String.valueOf(ukraineData.getConfirmed())), "primary-text",
-                String.format(lastDayTemplate, ukraineData.getDelta_confirmed()), "badge"),
+                String.format(lastDayTemplate, formatInteger(ukraineData.getDelta_confirmed())), "badge"),
                 createBadge("Активные", new H2(String.valueOf(ukraineData.getExisting())), "contrast-text",
-                        String.format(lastDayTemplate, ukraineData.getDelta_existing()), "badge contrast"),
+                        String.format(lastDayTemplate, formatInteger(ukraineData.getDelta_existing())), "badge contrast"),
                 createBadge("Выздоровело", new H2(String.valueOf(ukraineData.getRecovered())), "success-text",
-                        String.format(lastDayTemplate, ukraineData.getDelta_recovered()), "badge success"),
+                        String.format(lastDayTemplate, formatInteger(ukraineData.getDelta_recovered())), "badge success"),
                 createBadge("Умерло", new H2(String.valueOf(ukraineData.getDeaths())), "error-text",
-                        String.format(lastDayTemplate, ukraineData.getDelta_deaths()), "badge error")};
+                        String.format(lastDayTemplate, formatInteger(ukraineData.getDelta_deaths())), "badge error")};
+    }
+
+    private String formatInteger(Integer dataInteger) {
+        DecimalFormat decimalFormat = new DecimalFormat("+#,##0;-#");
+        return decimalFormat.format(dataInteger);
     }
 
     private WrapperCard createBadge(String title, H2 h2, String h2ClassName,
